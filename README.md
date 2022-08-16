@@ -6,6 +6,7 @@ Code and data to reproduce main figures and simulations of Chevy, Huerta-Sanchez
   - `figX_plot.py` contains all the code necessary to create Fig X.
   - `figX_data/` contains all data necessary to plot Fig X.  Datafiles from simulations are provided, and were generated using the scripts provided in `generating_simulation_data/`.  Sources for previously published data are provided in `README.md` files. 
   - `fig4_prep.py` contains the code for pickling the data necessary for plotting each panel of Fig 4 into four files: `fig4_tracts_[ABCD].pkl`.  These `.pkl` files are provided. 
+  - `extract_pI_data.py` and `extract_pI_data_sexbias.py` contain helper functions to organize simulation output files into dataframes.  They are imported as modules, so should be in the same directory or added to the path using `sys.path.append('/path/to/files')`.
 ### `generating_simulation_data`
  - `sim_seq_info.txt` contains the exon coordinates and recombination rate map used in SLiM simulations.
  - `simulation.slim` is an example SLiM simulation script used to generate simulated archaic coverage data.  In order to run a simulation, confirm that the:

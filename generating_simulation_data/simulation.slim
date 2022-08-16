@@ -1,0 +1,108 @@
+initialize() {
+    initializeMutationRate(1.5e-8*(2.31/3.31)*2);
+    initializeTreeSeq(recordMutations = F);
+    initializeSex("A");
+    defineConstant("male_frac", 0.5);
+    defineConstant("female_frac", 1 - male_frac);
+
+
+    //nonsynonymous drawn from a DFE from Kim et al.
+    // scale up by a factor of 2
+    // E[s], shape
+    initializeMutationType("m1", 0.0, "g", -0.01026*1*2, 0.186);
+
+    initializeGenomicElementType("g1", c(m1), c(1.0)); // no synonymous mutations, mutation rate is scaled
+
+    //read in exon and recomb info
+    info_lines = readFile("/path/to/ms-repo/generating_simulation_data/sim_seq_info.txt");
+
+    //recombination
+    rec_ends = NULL;
+    rec_rates = NULL;
+    for (line in info_lines[substr(info_lines, 0, 2) == "rec"])
+    {
+        components = strsplit(line, " ");
+        rec_ends = c(rec_ends, asInteger(components[1]));
+        rec_rates = c(rec_rates, asFloat(components[2]));
+    }
+    initializeRecombinationRate(0.5*(1-(1-2*rec_rates)^2), rec_ends); //multiply rec rates by scaling factor
+
+    //exons
+    for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
+    {
+        components = strsplit(line, " ");
+        exon_starts = asInteger(components[1]);
+        exon_ends = asInteger(components[2]);
+        initializeGenomicElement(g1, exon_starts, exon_ends);
+    }
+
+}
+
+
+10000 modifyChild(p1) {  // Introgression generation.
+    if ((sourceSubpop == p1) & (subpop == p2)) {
+        if (parent1.sex == "H") {  // This is a non-sexual model.
+            return T;
+        }
+        if (childIsFemale) {  // This is a daughter of migrants.
+            roll = sample( c(T, F), size=1, weights=c(female_frac, male_frac) );
+            return roll;
+        }
+        else {  // This is a son of migrants.
+            roll = sample( c(T, F), size=1, weights=c(male_frac, female_frac) );
+            return roll;
+        }
+    }
+    else {  // This child has local parents.
+        return T;
+    }
+}
+
+1: { // Print out simulation progress.
+    if (sim.generation % 500 == 0) {
+        print(sim.generation + " out of " + 17500);
+    }
+}
+
+1 early() {
+    defineConstant("simnum", getSeed());
+    print("Seed is " + simnum);
+    sim.addSubpop("p1",7500);
+}
+
+1 { // Explicitly remember individuals from which to recapitate.
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+}
+
+2 early() { // After recap generation, split populations into two: p1 (Neanderthals) and p2 (mHom:recips)
+    sim.addSubpopSplit("p2", 12500, p1);
+    p1.setSubpopulationSize(125);
+}
+2 late() {  // Sample oldest Neanderthals.
+	sim.treeSeqRememberIndividuals(p1.individuals);
+}
+
+10000 early() {  // Introgression generation.
+    p2.setMigrationRates(p1, 0.05 * 2);  // Doubled to get correct number of haplotypes empirically
+}
+
+10000 late() {
+    p2.setMigrationRates(p1, 0);
+
+    migrants = p2.subsetIndividuals(migrant = T);
+    sim.treeSeqRememberIndividuals(migrants);  // Remember Neanderthal introgressors
+}
+
+// // Uncomment for "timecourse" simulations
+// 10001:10020 late() {  
+//     sim.treeSeqRememberIndividuals(p2.individuals);
+// }
+
+17500 {
+    p2.setSubpopulationSize(1000);  // Subsample for final TreeSeq output
+}
+
+17500 late() {
+    sim.treeSeqOutput("/path/to/ms-repo/generating_simulation_data/chr1_h0.0_sscale1_NsNr0.01_mfrac0.5_" + simnum + ".trees.decap");
+}
+
