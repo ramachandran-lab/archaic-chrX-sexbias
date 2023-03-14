@@ -3,51 +3,134 @@
 """
 Code for plotting Fig 4.
 
-    Archaic coverage tracts on chromosome X are longer than those on an autosome.
-        All results shown reflect an additive model of dominance.
-    A
-        Tract length spectra from simulations of an archaic introgression scenario under autosomal or chromosome X inheritance; note log scale.
-        Points indicate frequencies of archaic coverage tracts within length bins of 3000 bp.
-        Simulated chromosomes shared a variable recombination rate landscape (see Methods for details).
-        Solid lines indicate expected archaic coverage lengths under a simple, neutral model with constant recombination rate equal to the mean rate of the simulated recombination landscape.
-    B
-        Average recombination rate within each simulated archaic coverage tract, plotted against length of the tract.  Note log scale.
-    C
-        Proportion of archaic coverage tracts that are a given length or shorter; proportions are calculated within each inheritance type.
-        Arrow indicates 95th percentile of tract lengths, illustrated in panel D alongside sex-biased scenarios.
-    D
-        Distribution of 95th percentiles of archaic coverage tract lengths found on either an autosome or chromosome X, across degrees of introgressor sex-bias.
-        Each box reflects the length distributions from ten simulation replicates.
-"""
+    The rapid timecourse of archaic coverage purging on the autosomes and chromosome X.
 
-from matplotlib import pyplot as plt
-import matplotlib.patches as mpatch
+        Carets on the x-axis indicate the generation at which mean coverage has fallen halfway to its final value from its value in the generation immediately following introgression.
+        Carets on the y-axis indicate the initial introgression fraction.
+        Error bars are bootstrapped empirical 95% confidence intervals around means of all samples across all simulation replicates.
+        See S5 Fig for a visualization the per-haplotype variance in archaic coverage over time.
+    A
+        Autosomal simulations.
+    B
+        Chromosome X simulations.
+"""
+import extract_pI_data as pI
+import extract_pI_data_sexbias as sexpI
+
+import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.cm as colors
-
+from matplotlib.collections import PatchCollection
 import numpy as np
-import itertools
 
 
-# %%  Go get the data
-# Run prep_fig4.py to generate these pickle files.
+# %% Import data
 
-import pickle
+path_to_sex = 'fig4_data/'
+sex_df = sexpI.compile_df_from_pI_files(path_to_sex, include_timecourse=True)
 
-with open('fig4_tracts_A.pkl', "rb") as f:
-    x_ax = pickle.load(f)
-    a_counts, x_counts = pickle.load(f)
-    exp_cdfA, exp_cdfX = pickle.load(f)
+sex1_add_df = sexpI.subset_pI(sex_df, c='1', d='0.5SLiM', s=1, n=0.01, m=[0, 0.5, 1])
+sex1_rec_df = sexpI.subset_pI(sex_df, c='1', d='0.0', s=1, n=0.01, m=[0, 0.5, 1])
+sexX_add_df = sexpI.subset_pI(sex_df, c='X', d='0.5SLiM', s=1, n=0.01, m=[0, 0.5, 1])
+sexX_rec_df = sexpI.subset_pI(sex_df, c='X', d='0.0', s=1, n=0.01, m=[0, 0.5, 1])
 
-with open('fig4_tracts_B.pkl', "rb") as f:
-    a_len_rec = pickle.load(f)
-    x_len_rec = pickle.load(f)
 
-with open('fig4_tracts_C.pkl', "rb") as f:
-    a_props, x_props = pickle.load(f)
+# %% Functions needed for plotting
 
-with open('fig4_tracts_D.pkl', "rb") as f:
-    boxplot_cutoffs_add = pickle.load(f)
+def find_time_to_halfway(df, mf, from_f1=True):
+    mfdf = sexpI.subset_pI(df, m=mf)
+    timepoint_means = mfdf.groupby('timepoint')['pI'].mean()
+    final_mean = timepoint_means[0]
+
+    if from_f1:
+        initial = timepoint_means.iloc[-1]
+    else:
+        initial = 0.05
+    halfway = 0.5 * (initial - final_mean) + final_mean
+    timepoint_diff_from_half = timepoint_means - halfway
+
+    further_than_half = timepoint_diff_from_half[timepoint_diff_from_half.lt(0)]
+    first_gen_further = further_than_half.tail(1).index.item()
+
+    # simulations are run a double scale.  Change back to nominal generations.
+    first_gen_simscale = 2 * 7500
+    first_gen_further_simscale = 2 * first_gen_further
+
+    time_to_half = first_gen_simscale - first_gen_further_simscale
+    return time_to_half
+
+
+def mean_pI_by_timepoint_errorbar(ax, input_df, label=None, style='o',
+                                  color=None, fill=None, size=10, B=20,
+                                  verbose=True):
+    """Construct 95% confidence intervals reflecting grand samples.
+    """
+    def bs_mean(data, B=2000, thresh=5):
+        n = len(data)
+        mean = np.mean(data)
+        draws = np.random.choice(data, size=(B, n), replace=True)
+        bs_means = np.mean(draws, axis=1)
+        ci_limits = np.percentile(bs_means, (thresh / 2, 100 - thresh / 2))
+        yerr_lwr = mean - ci_limits[0]
+        yerr_upr = ci_limits[1] - mean
+        return mean, ci_limits, (yerr_lwr, yerr_upr)
+
+    timepoints = np.unique(input_df['timepoint'])
+
+    mean_list = []
+    yerr_pair_list = []
+    for t in timepoints:
+        this_df = pI.subset_pI(input_df, t=t)
+        if verbose:
+            print(f"timepoint {t}/7500: n=={len(this_df['pI'])}, B=={B} ")
+        timepoint_mean, this_e95CI, these_yerr_limits = bs_mean(this_df['pI'], B=B)
+        mean_list.append(timepoint_mean)
+        yerr_pair_list.append(these_yerr_limits)
+    yerr_lwr, yerr_upr = zip(*yerr_pair_list)
+    yerr_matrix = np.vstack([yerr_lwr, yerr_upr])
+
+    # create "false"/"broken" x axis to accommodate timepoint 0 with false0
+    broken_0 = timepoints[1] - 5  # x-axis location at which to place "0"
+    broken_x_axis = [broken_0] + list(timepoints[1:])
+
+    # call plot
+    ax.errorbar(broken_x_axis, mean_list, yerr=yerr_matrix, label=label,
+                fmt=style, mfc=fill, color=color, markersize=size, linewidth=size / 4)
+
+    # label x-axis each 5 generations in reverse time
+    ax.set_xlim([timepoints[-1] + 1, broken_0 - 1])
+    timeticks = [int(i) for i in np.arange(start=timepoints[-1] + 1,
+                                           stop=timepoints[1], step=-5)]
+    ax.set_xticks(timeticks + [broken_0])
+    tt_labels = [2 * t for t in timeticks] + [0]
+    ax.set_xticklabels(tt_labels)
+
+    return ax
+
+
+# Make two-color boxes for legend
+    # https://stackoverflow.com/a/67870930/18621926
+# define an object that will be used by the legend
+class MulticolorPatch(object):
+    def __init__(self, colors):
+        self.colors = colors
+
+
+# define a handler for the MulticolorPatch object
+class MulticolorPatchHandler(object):
+    def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+        width, height = handlebox.width, handlebox.height
+        patches = []
+        for i, c in enumerate(orig_handle.colors):
+            patches.append(plt.Rectangle([width / len(orig_handle.colors) * i - handlebox.xdescent,
+                                          -handlebox.ydescent],
+                           width / len(orig_handle.colors),
+                           height,
+                           facecolor=c,
+                           edgecolor='none'))
+        patch = PatchCollection(patches, match_original=True)
+        handlebox.add_artist(patch)
+        return patch
 
 
 # %% Plot
@@ -59,127 +142,107 @@ plt.rcParams['font.sans-serif'] = 'Arial'
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.size'] = 8
 
-# colors
-cmap = colors.get_cmap(name='tab20')
-afc = cmap(1)
-aec = cmap(0)
-xfc = cmap(3)
-xec = cmap(2)
+
+def plot_dom_timecourse_mean_by_sexbias_errorbar_2pack(x_add_df, x_rec_df,
+                                                       a_add_df, a_rec_df,
+                                                       size=10, verbose=False):
+    fig, (axa, axx) = plt.subplots(ncols=2, sharey=True, sharex=True, figsize=(5.2, 3))
+
+    # Legend
+    cmap = colors.get_cmap(name='Set2')
+    color_dict = {('X', 0): cmap(3), ('X', 0.5): cmap(1), ('X', 1): cmap(5),
+                  ('1', 0): cmap(4), ('1', 0.5): cmap(0), ('1', 1): cmap(2)}
+    male_colors = MulticolorPatch([color_dict[('1', 1)], color_dict[('X', 1)]])
+    even_colors = MulticolorPatch([color_dict[('1', 0.5)], color_dict[('X', 0.5)]])
+    female_colors = MulticolorPatch([color_dict[('1', 0)], color_dict[('X', 0)]])
+
+    add_shape = mlines.Line2D([], [], color='k', marker='o', linestyle='None',
+                              label='Additive variants ($h=0.5$)')
+    rec_shape = mlines.Line2D([], [], color='k', marker='o', mfc='none',
+                              linestyle='None', label='Recessive variants ($h=0.0$)')
+    l = mlines.Line2D([0], [0], color="w")
+
+    legend = fig.legend(handles=[add_shape,
+                                 rec_shape,
+                                 l,
+                                 male_colors,
+                                 even_colors,
+                                 female_colors],
+                        labels=['Additive variants ($h=0.5$)',
+                                'Recessive variants ($h=0.0$)',
+                                '',
+                                'male introgressors ($p=0$)',
+                                'no sex-bias ($p=0.5$)',
+                                'female introgressors ($p=1$)'],
+                        handler_map={MulticolorPatch: MulticolorPatchHandler()},
+                        frameon=True, fontsize=8, ncol=2)
+
+    # plot points
+    def one_dom(input_ax, input_df, chromosome, marker='o', fill=None, verbose=False):
+        mfrac_levels = input_df["target_male_frac"].unique()
+        mfrac_levels.sort()
+        for mf in mfrac_levels:
+            mdf = sexpI.subset_pI(input_df, m=mf)
+            col = color_dict[(chromosome, mf)]
+
+            input_ax = mean_pI_by_timepoint_errorbar(input_ax, mdf,
+                                                     label='p = ' + str(1 - mf),
+                                                     color=col, style=marker,
+                                                     fill=fill, size=size,
+                                                     B=2000, verbose=verbose)
+            # x-axis carets for 50% timepoint
+            half_x = 7500 - 0.5 * find_time_to_halfway(input_df, mf) - 0.15 + 0.3 * mf
+            input_ax.plot(half_x, 0, marker=10, color=col, mfc=fill, clip_on=False)
+
+            # y-axis carets for initial introg line
+            level = 0.05
+            if chromosome == 'X':
+                level *= (1 - 0.5 * mf)
+            input_ax.plot(7500, level, marker=9, color=col, mfc=fill, clip_on=False)
+        return input_ax
+
+    if verbose:
+        print('---Generating errorbars for chrX additive---')
+    axx = one_dom(axx, x_add_df, 'X', marker='o', verbose=verbose)
+    if verbose:
+        print('---Generating errorbars for chrX recessive---')
+    axx = one_dom(axx, x_rec_df, 'X', marker='o', fill='none', verbose=verbose)
+    if verbose:
+        print('---Generating errorbars for aut additive---')
+    axa = one_dom(axa, a_add_df, '1', marker='o', verbose=verbose)
+    if verbose:
+        print('---Generating errorbars for aut recessive---')
+    axa = one_dom(axa, a_rec_df, '1', marker='o', fill='none', verbose=verbose)
+
+    # labels and title
+    axa.set_ylim([0, 0.065])
+    axa.set_ylabel('Archaic coverage (per bp)')
+    axx.set_xlabel('Generations ago')
+    axa.set_xlabel('Generations ago')
+
+    axa.set_title('Autosome')
+    axx.set_title('Chromosome X')
+
+    for ax, label in zip(fig.get_axes(), ['A', 'B', 'C', 'D', 'E']):
+        ax.text(0.1, 0.97, label, transform=ax.transAxes,
+                fontsize=12, fontweight='bold', va='top', ha='right')
+
+    plt.tight_layout()
+    return fig, (axa, axx)
 
 
-fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(7.5, 5))
+#  Generating errorbars for all points can be slow.
+#  Set verbose=True for progress indication.
+fig, (axa, axx) = plot_dom_timecourse_mean_by_sexbias_errorbar_2pack(sexX_add_df, sexX_rec_df,
+                                                   sex1_add_df, sex1_rec_df,
+                                                   size=4, verbose=True)
 
-axa = axes[0][0]
-axb = axes[1][0]
-axc = axes[0][1]
-axd = axes[1][1]
+# %%  Save figures
 
-axa.get_shared_x_axes().join(axa, axb)
-axa.tick_params(labelbottom=False)
+save_figures = False
+if save_figures:
 
-# axis labels
-axa.set_ylabel('Frequency')
-axb.set_ylabel('Average recombination rate')
-axc.set_ylabel('Cumulative proportion of tracts')
-axd.set_ylabel('95%tile of coverage tract lengths (kbp)')
-
-axb.set_xlabel('Length of archaic coverage tract (bp)')
-axc.set_xlabel('Length of archaic coverage tract (bp)')
-
-
-# panel labels
-axa.text(0.98, 0.97, 'A', transform=axa.transAxes,
-         fontsize=12, fontweight='bold', va='top', ha='right')
-axb.text(0.98, 0.97, 'B', transform=axb.transAxes,
-         fontsize=12, fontweight='bold', va='top', ha='right')
-axc.text(0.06, 0.97, 'C', transform=axc.transAxes,
-         fontsize=12, fontweight='bold', va='top', ha='right')
-axd.text(0.06, 0.97, 'D', transform=axd.transAxes,
-         fontsize=12, fontweight='bold', va='top', ha='right')
-
-plt.tight_layout(pad=0.5)
-
-
-# Panel A
-axa.plot(x_ax, a_counts[1:], marker='.', linestyle='None', label="Autosome")
-axa.plot(x_ax, x_counts[1:], marker='.', linestyle='None', label="Chromosome X")
-axa.set_ylim([1, 10e6])
-axa.plot(x_ax, exp_cdfA, color=aec, alpha=0.8)
-axa.plot(x_ax, exp_cdfX, color=xec, alpha=0.8)
-axa.set_yscale('log')
-axa.set_xscale('log')
-
-#   legend
-exp_line = mlines.Line2D([], [], color='k', marker=None, linestyle='solid',
-                         alpha=0.8,
-                         label='Neutral, constant recomb')
-blue_blob = mpatch.Patch(color=aec, label='Autosome')
-orange_blob = mpatch.Patch(color=xec, label='Chromosome X')
-sim_dot = mlines.Line2D([], [], color='k', marker='.',
-                        linestyle='None', label='Simulated tract lengths')
-
-legend_info = [blue_blob, orange_blob, sim_dot, exp_line]
-axa.legend(handles=legend_info, fontsize=8)
-
-# Panel C
-axc.plot(x_ax, a_props, marker='.', linestyle=':')
-axc.plot(x_ax, x_props, marker='.', linestyle=':')
-axc.set_xscale('log')
-axc.annotate("", xy=(36000, 0.95), xytext=(20000, 0.95), arrowprops=dict(arrowstyle="->"))
-
-# Panel B
-a_len, a_rec = a_len_rec
-x_len, x_rec = x_len_rec
-a_len = np.concatenate(a_len).ravel()
-x_len = np.concatenate(x_len).ravel()
-a_rec = list(itertools.chain(*a_rec))
-x_rec = list(itertools.chain(*x_rec))
-axb.plot(a_len, a_rec, marker='.', lw=0, linestyle="", markersize=1,
-         c=aec, rasterized=True)
-axb.plot(x_len, x_rec, marker='.', lw=0, linestyle="", markersize=1,
-         c=xec, rasterized=True)
-axb.set_xscale('log')
-axb.set_yscale('log')
-
-# Panel D
-bp_co_addA, bp_co_addX = zip(*boxplot_cutoffs_add)
-kbp_co_addA = [box_data / 1000 for box_data in bp_co_addA]
-kbp_co_addX = [box_data / 1000 for box_data in bp_co_addX]
-
-cmfs = np.asarray([0, 0.5, 1])
-scootch = 0.05
-axd.boxplot(kbp_co_addA,
-                positions=cmfs + scootch,
-                widths=scootch * 1,
-                patch_artist=True,
-                boxprops=dict(facecolor=afc, color=aec),
-                capprops=dict(color=aec),
-                whiskerprops=dict(color=aec),
-                flierprops=dict(color=afc, markeredgecolor=aec),
-                medianprops=dict(color=aec)
-            )
-
-axd.boxplot(kbp_co_addX,
-                positions=cmfs - scootch,
-                widths=scootch * 1,
-                patch_artist=True,
-                boxprops=dict(facecolor=xfc, color=xec),
-                capprops=dict(color=xec),
-                whiskerprops=dict(color=xec),
-                flierprops=dict(color=xfc, markeredgecolor=xec),
-                medianprops=dict(color=xec)
-            )
-axd.set_xticks(cmfs)
-axd.set_xticklabels(['female\nintrogressors\n($p = 1$)',
-                     'no\nsexbias\n($p = 0.5$)',
-                     'male\nintrogressors\n($p = 0$)'],
-                    fontsize=8)
-axd.invert_xaxis()
-
-
-# %% Save
-
-# plt.savefig('fig4_tracts.png',
-#             format='png', dpi=600, bbox_inches='tight')
-# plt.savefig('fig4_tracts.svg',
-#             format='svg', dpi=600, bbox_inches='tight')
+    plt.savefig('fig4_timecourse.svg',
+                format='svg', dpi=600, bbox_inches='tight')
+    plt.savefig('fig4_timecourse.png',
+                format='png', dpi=600, bbox_inches='tight')

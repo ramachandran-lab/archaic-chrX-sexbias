@@ -42,7 +42,7 @@ chrX_rec_df = sexpI.subset_pI(megadf, c='X', d='0.0', s=1, n=0.01)
 
 # %% Calculate aut:chrX ratio from sim data
 
-def bs_autx_prop(aut_pIs, x_pIs, n=1000, B=2000):
+def bs_autx_prop(aut_pIs, x_pIs, ratio_handling='ratioOfMeans', n=1000, B=2000):
     """
     Bootstrap the aut:chrX coverage proportion from simulation data.
 
@@ -72,23 +72,26 @@ def bs_autx_prop(aut_pIs, x_pIs, n=1000, B=2000):
     if n is None:
         n = min(len(aut_pIs), len(x_pIs))
         print(n)
+    assert min(len(aut_pIs), len(x_pIs)) >= n
+
     a_choices = np.random.choice(aut_pIs, size=(B, n), replace=True)
     x_choices = np.random.choice(x_pIs, size=(B, n), replace=True)
 
-    ratios_for_bs = a_choices / x_choices
-    bs_ratio_means = np.mean(ratios_for_bs, axis=1)
-    this_mean_stat = np.mean(bs_ratio_means)
-    these_cis = np.percentile(bs_ratio_means, (2.5, 97.5))
-    # yerr_lwr = this_mean_stat - these_cis[0]
-    # yerr_upr = these_cis[1] - this_mean_stat
+    if ratio_handling == 'ratioOfMeans':
+        a_means = np.mean(a_choices, axis=1)
+        x_means = np.mean(x_choices, axis=1)
+        bs_ratios = a_means / x_means
+    elif ratio_handling == 'meanOfRatios':
+        ratios_for_bs = a_choices / x_choices
+        bs_ratios = np.mean(ratios_for_bs, axis=1)
+    this_mean_stat = np.mean(bs_ratios)
+    these_cis = np.percentile(bs_ratios, (2.5, 97.5))
 
-    return this_mean_stat, np.std(bs_ratio_means), (len(bs_ratio_means), (len(aut_pIs), len(x_pIs))), these_cis
+    return this_mean_stat, np.std(bs_ratios), (len(bs_ratios), (len(aut_pIs), len(x_pIs))), these_cis
 
-
-mfrac_list = (0, 0.2, 0.4, 0.5, 0.6, 0.8, 1)
 mfrac_list = (1, 0.5, 0)
 
-n = 10000  # number of aut:chrX ratios to generate
+n = None  # number of aut:chrX ratios to generate
 additive_ratio_stats = {}
 recessive_ratio_stats = {}
 for m in mfrac_list:
@@ -249,7 +252,7 @@ def plot_sexbias_violins_with_ratio(add_stats, rec_stats, mfracs=(1, 0.5, 0),
     endpoints = list(sum(points, ()))
     axadd.plot(*endpoints, linestyle='--', color=orange, zorder=1, alpha=0.75)
     axrec.plot(*endpoints, linestyle='--', color=orange, zorder=1, alpha=0.75)
-    # aut initial introg lines
+    # aut initial introg linesx
     initial_levels = 0.05 * np.array([1, 1, 1])
     levels = zip(initial_levels, mfracs)
     points = [((x - 0.2, x + 0.2), (i, i)) for i, x in levels]
@@ -266,6 +269,7 @@ def plot_sexbias_violins_with_ratio(add_stats, rec_stats, mfracs=(1, 0.5, 0),
 
     # labels
     raxadd.set_ylabel('Aut:ChrX')
+    raxadd.set_yticks([1, 2, 3])
     axadd.set_ylabel('Archaic coverage (per bp)')
     raxadd.set_title('Additive variants ($h=0.5$)', fontsize=10)
     raxrec.set_title('Recessive variants ($h=0.0$)', fontsize=10)
@@ -295,7 +299,12 @@ def plot_sexbias_violins_with_ratio(add_stats, rec_stats, mfracs=(1, 0.5, 0),
 
 plot_sexbias_violins_with_ratio(additive_ratio_stats, recessive_ratio_stats)
 
-# plt.savefig('fig3_violins.svg',
-#             format='svg', dpi=600, bbox_inches='tight')
-# plt.savefig('fig3_violins.png',
-#             format='png', dpi=600, bbox_inches='tight')
+
+# %%  Save figures
+
+save_figures = False
+if save_figures:
+    plt.savefig('fig3_violins.svg',
+                format='svg', dpi=600, bbox_inches='tight')
+    plt.savefig('fig3_violins.png',
+                format='png', dpi=600, bbox_inches='tight')

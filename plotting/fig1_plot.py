@@ -23,11 +23,11 @@ from matplotlib import lines as mlines
 sgdp_info_file2 = 'fig1_data/10_24_2014_SGDP_metainformation_update.txt'
 sgdp_info_file = 'fig1_data/SGDP_metadata.279public.21signedLetter.44Fan.samples.txt'
 sank_file = 'fig1_data/Sank16long.txt'
-table1_file = 'fig1_data/table1.txt'
+table1_file = 'fig1_data/table1_missing.txt'
 skovSGDP_file = 'fig1_data/pgen.1007641.s012.txt'
 
 # Dataframes
-oldtab1df = pd.read_csv(table1_file, sep='\t', index_col=False)
+oldtab1df = pd.read_csv(table1_file, sep=' ', index_col=False)
 sankdf = pd.read_csv(sank_file, sep='\t', index_col=False,
                      names=['aut', 'aut_stderr', 'chrX', 'chrX_stderr',
                             'data_source', 'archaic', 'superpop', 'pop'])
@@ -155,6 +155,7 @@ tab1df['chrX'] *= 0.01
 
 # %% Plotting
 
+# params for figure
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['svg.fonttype'] = 'none'
 
@@ -163,7 +164,7 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.size'] = 10
 
 data_list = ['ARGWeaver-D', 'Dical-admix', 'Sank14', 'Sank16Neand',
-             'Sank16Denis', 'Skov1kG', 'SkovSGDP']
+             'Sank16Denis', 'hmmix', 'SkovSGDP']
 marker_list = ['p', '*', 'o', '.', 'x', 'X', '+']
 data2m_dict = dict(zip(data_list, marker_list))
 
@@ -174,10 +175,20 @@ tallest = max(tab1df['chrX'])
 widest = max(tab1df['aut'])
 allmedian = tab1df['Aut_ChrX_ratio'].median()
 ax.plot([0, widest], [0, (1 / allmedian) * widest], ls='solid', color='grey', zorder=2)
+
+ax.annotate("Aut:chrX::1:1", xy=(0.0138, 0.013))
 ax.plot([0, tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
+
+ax.annotate("2:1", xy=(0.0272, 0.013))
 ax.plot([0, 2 * tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
+
+ax.annotate("4:1", xy=(0.0279, 0.0074))
 ax.plot([0, widest], [0, 0.25 * widest], ls='solid', c='lightgrey', zorder=1)
-ax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
+
+# ax.annotate("8:1", xy=(0.038, 0.0041))
+# ax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
+
+ax.annotate("16:1", xy=(0.02737, 0.001))
 ax.plot([0, widest], [0, (1 / 16) * widest], ls='solid', c='lightgrey', zorder=1)
 
 # data (scatter, no errorbars)
@@ -238,7 +249,7 @@ dax.plot([0, widest], [0, (1 / allmedian) * widest], ls='solid', color='grey', z
 dax.plot([0, tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, 2 * tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, widest], [0, 0.25 * widest], ls='solid', c='lightgrey', zorder=1)
-dax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
+# dax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, widest], [0, (1 / 16) * widest], ls='solid', c='lightgrey', zorder=1)
 for d in data_list:
     mask = tab1df['data_source'] == d
@@ -257,7 +268,11 @@ dax.set_yticks([])
 # ax.indicate_inset_zoom(dax)
 
 
-# plt.savefig('fig1_table1.svg',
-#             format='svg', dpi=600, bbox_inches='tight')
-# plt.savefig('fig1_table1.png',
-#             format='png', dpi=600, bbox_inches='tight')
+# %%  Save figures
+
+save_figures = False
+if save_figures:
+    plt.savefig('fig1_table1.svg',
+                format='svg', dpi=600, bbox_inches='tight')
+    plt.savefig('fig1_table1.png',
+                format='png', dpi=600, bbox_inches='tight')

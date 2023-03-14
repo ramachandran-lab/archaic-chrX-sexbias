@@ -4,26 +4,28 @@
 Code for plotting Fig 2.
 
     Distribution of archaic coverage between autosomes and chromosome X amongst 1kG samples.
-        Coverage estimated by Skov et al. [18] from data from The 1000 Genomes Project Consortium [19].
+        Coverage estimated by method of Skov et al. [18] from data from The 1000 Genomes Project Consortium [19].
         See Table 1 for key to abbreviations.
     A
         Mean aut:chrX archaic coverage ratio among continental groups.
         Error bars show bootstrapped 95% confidence intervals around the means.
-        Distributions of archaic coverage on autosomes
     B
-        and chromosome X
+        Distributions of archaic coverage on autosomes and
     C
-        across individuals, colored by continental group. Carets indicate means.
-        Summaries of coverage ratios
-    D,
-        as well as coverage distributions on the two chromosome types
+        chromosome X across individuals, colored by continental group.
+        Carets indicate means.
+    D
+        Summaries of coverage ratios, as well as
     E
-        among 1kG sample groups.
+        coverage distributions on the two chromosome types among 1kG sample groups.
         Populations are sorted by ascending archaic coverage amounts on chromosome X.
+    F
+        Rank orderings of 1kG sample groups by mean chrX coverage, mean autosomal coverage, and aut:chrX ratio, sorted from least to greatest.
 """
 
 import pandas as pd
 import numpy as np
+from interlap import InterLap
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
@@ -50,73 +52,40 @@ def find_superpop(pop, return_color=False):
         return superpop
 
 
-# %% Assemble data (Skov 1kG calls)
+# %% Grab data from hmmix
+hmmix_file = f'fig2_data/noPARnoselection_output.csv.gz'
 
-datafile_1kG = 'fig2_data/LauritsSkovIntrogressionMaps/Archaicsegment_1000genomes.txt.gz'
+df = pd.read_csv(hmmix_file)
+df['names'] = df['name']
+# remove samples
+midf = df[df['aut_pbp'] < 0.1]
+midf = midf[midf['aut_x_ratio'] < 50]
 
-all_data_1kG = pd.read_csv(datafile_1kG, sep='\t', header=0,
-                           names=['names', 'chr', 'start', 'end',
-                                  'length', 'num_snps', 'pop', 'prob',
-                                  'snpA', 'snpD', 'snpV', 'snps'],
-                           usecols=[0, 1, 4, 6, 7])
+# %%  create file for table 1
 
-df = all_data_1kG[all_data_1kG['prob'] > 0.8]
+tab1_means = midf.groupby('pop').mean()[['aut_pbp', 'x_pbp', 'aut_x_ratio']]
+tab1_means['aut'] = tab1_means['aut_pbp']
+tab1_means['aut'] *= 100
+tab1_means['aut'] = tab1_means['aut'].apply(lambda x: round(x, 2))
 
-df = df.drop('prob', axis='columns')
-populations = df['pop'].unique()
-chromosomes = df['chr'].unique()
-samples = df['names'].unique()
-# our populations are:
-#    ['GBR', 'FIN', 'CHS', 'PUR', 'CDX', 'CLM', 'IBS', 'PEL', 'PJL',
-#     'KHV', 'BEB', 'STU', 'ITU', 'CEU', 'CHB', 'JPT', 'MXL', 'TSI',
-#     'GIH']
+tab1_means['chrX'] = tab1_means['x_pbp']
+tab1_means['chrX'] *= 100
+tab1_means['chrX'] = tab1_means['chrX'].apply(lambda x: round(x, 2))
 
-b = df.groupby(["pop", "chr"]).sum()
-c = df.groupby(["names", "chr"]).sum()
+tab1_means['aut_x_ratio'] = tab1_means['aut_x_ratio'].apply(lambda x: round(x, 1))
+tab1_means.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
 
-# check that all pop'ns have all chromosomes
-assert all([p in b.index for p in zip(populations, chromosomes)])
+tab1_sterr = midf.groupby('pop').std()[['aut_pbp', 'x_pbp']]
+tab1_sterr *= 100
+tab1_sterr = tab1_sterr.apply(lambda x: round(x, 2))
 
-# check that all samples have all chromosomes
-assert all([p in c.index for p in zip(samples, chromosomes)])
+tab1 = tab1_means.join(tab1_sterr)
+tab1['aut_stderr'] = tab1['aut_pbp']
+tab1['chrX_stderr'] = tab1['x_pbp']
+tab1.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
+tab1.sort_values('aut_x_ratio', inplace=True, ascending=False)
 
-# There are 42385 entries in c, yet number of unique samples*23 = 42389
-[len(sdf["names"].unique()) for sdf in [df[df["chr"] == c] for c in chromosomes]]
-# four samples are missing chrX data.  which ones?
-aut_samps, x_samps = [sdf["names"].unique() for sdf in [df[df["chr"] == c] for
-                                                        c in ['22', 'X']]]
-assert all(aut_samps == samples)
-no_x_samps = list(set(aut_samps) - set(x_samps))
-# Remove the samples without chrX data from df
-df = df.drop(df[df["names"].isin(no_x_samps)].index)
-assert set(df["names"]) == set(x_samps)
-
-# #  Make aut:chrX ratio
-# Collapse autosomes into sums
-a_sums = df[df["chr"] != "X"].groupby(['pop', 'names']).sum()
-x_sums = df[df["chr"] == "X"].groupby(['pop', 'names']).sum()
-
-a_sums.rename(columns={"length": "aut_len"}, inplace=True)
-x_sums.rename(columns={"length": "x_len"}, inplace=True)
-sums = pd.concat([a_sums, x_sums], axis=1)
-
-# Get lengths from Hg19 (aka GRCh37) to make per-bp numbers
-# https://www.ncbi.nlm.nih.gov/grc/human/data?asm=GRCh37
-aut_len = 2981033286
-x_len = 155270560
-
-sums['aut_pbp'] = sums['aut_len'] / aut_len
-sums['x_pbp'] = sums['x_len'] / x_len
-
-sums['aut_x_ratio'] = sums['aut_pbp'] / sums['x_pbp']
-
-
-# # make a df
-dfp = sums.reset_index(level=['pop'])
-superpops = dfp["pop"].apply(find_superpop)
-dfp.insert(0, 'superpop', superpops)
-# remove samples with outlying aut:chrX ratios
-midf = dfp[dfp['aut_x_ratio'] < 200]
+tab1.to_csv('table1_hmmix.txt', sep=' ')
 
 # %% Functions needed for plotting
 
@@ -186,7 +155,9 @@ def plot_ratio_eCI(df, by, sort_order=None, existing_axis=None, thresh=5):
     return existing_axis
 
 
-# %% **Multipanel figure
+
+# %% * Plot Fig 2
+
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['svg.fonttype'] = 'none'
 
@@ -196,17 +167,19 @@ plt.rcParams['font.size'] = 10
 
 
 fig = plt.figure(figsize=(7.5, 7.5))
-gs = fig.add_gridspec(nrows=4, ncols=2)
+gs = fig.add_gridspec(nrows=5, ncols=2)
 
 axa = fig.add_subplot(gs[0:2, 0])
 axb = fig.add_subplot(gs[0, 1])
 axc = fig.add_subplot(gs[1, 1], sharex=axb)
 axd = fig.add_subplot(gs[2, :])
 axe = fig.add_subplot(gs[3, :])
+axf = fig.add_subplot(gs[4, :])
 
 
 # # Panels A, B, C
-plot_ratio_eCI(midf, by='superpop', existing_axis=axa)
+# Panel A:
+plot_ratio_eCI(midf, by='superpop', existing_axis=axa, sort_order=['EUR', 'AMR', 'EAS', 'SAS'])
 axa.set_ylabel('Autosomal : Chromosome X coverage ratio')
 
 # Panels B, C: stacked bar by superpop
@@ -224,10 +197,11 @@ for sp in sps:
     rel_a_by_superpop.append(np.asarray(spdf['aut_pbp']))
 
     # plot carets in loop for coloring
-    caret_y = 80
-    axb.plot(aut_means[-1], caret_y, marker=7, clip_on=False, ls='none',
+    axb_caret_y = 60
+    axc_caret_y = 82.95
+    axb.plot(aut_means[-1], axb_caret_y, marker=7, clip_on=False, ls='none',
              markerfacecolor=superpop_colors[sp], markeredgecolor=aec)
-    axc.plot(x_means[-1], caret_y, marker=7, clip_on=False, ls='none',
+    axc.plot(x_means[-1], axc_caret_y, marker=7, clip_on=False, ls='none',
              markerfacecolor=superpop_colors[sp], markeredgecolor=xec)
 
 axb.hist(rel_a_by_superpop, bins=num_bins, stacked=True,
@@ -276,7 +250,7 @@ for patch, pop in zip(px_boxes['boxes'], popns):
     patch.set_facecolor(find_superpop(pop, return_color=True))
 axe.set_xticks(list(range(len(popns))), labels=popns, fontsize=9)
 axe.set_ylabel("Archaic coverage (per bp)")
-axe.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+axe.tick_params(top=True, labeltop=True, bottom=True, labelbottom=True)
 axe.tick_params(axis='x', pad=12)
 
 # Panel D: Ratio errorbar
@@ -285,7 +259,35 @@ axd = plot_ratio_eCI(midf, 'pop', sort_order=popns, existing_axis=axd)
 axd.tick_params(labelbottom=False)
 axd.set_xlim(axe.get_xlim())
 
-# # Legend
+# Panel F: Rankings
+popns_x = get_sort_order('x_pbp')
+popns_rat = get_sort_order('aut_x_ratio')
+popns_aut = get_sort_order('aut_pbp')
+
+rank_x = dict(zip(popns_x, range(len(popns_x))))
+rank_aut = dict(zip(popns_aut, range(len(popns_aut))))
+rank_rat = dict(zip(popns_rat, range(len(popns_rat))))
+
+axf.set_ylim([-0.2, 2.2])
+axf.set_yticks([0, 1, 2])
+axf.set_yticklabels(['Aut:ChrX', 'aut\ncoverage', 'chrX\ncoverage'],
+                    fontsize=9)
+axf.set_xticks(list(range(len(popns_x))))
+axf.tick_params(top=True, labeltop=False, bottom=False, labelbottom=False)
+axf.set_xlim(axe.get_xlim())
+axfb = axf.secondary_xaxis('bottom')
+axfb.set_xticks([0, 18], labels=['least', 'greatest'])
+for pop in popns_x:
+    axf.plot([rank_x[pop], rank_aut[pop], rank_rat[pop]], [2, 1, 0],
+             ls='solid', alpha=0.1,
+             color=find_superpop(pop, return_color=True))
+    marker_string = '$\mathtt{' + str(pop) + '}$'
+    axf.plot([rank_x[pop], rank_aut[pop], rank_rat[pop]], [2, 1, 0],
+             marker=marker_string, markersize=16, ls='None',
+             color=find_superpop(pop, return_color=True))
+
+
+# Legend
 eas_patch = mpatches.Patch(edgecolor=superpop_colors['EAS'],
                            facecolor=superpop_colors['EAS'],
                            label='EAS')
@@ -310,11 +312,13 @@ axa.legend(handles=legend_handles, ncol=2, frameon=True)
 plt.tight_layout()
 
 # panel labels
-for ax, label in zip(fig.get_axes(), ['A', 'B', 'C', 'D', 'E']):
-    ax.text(0.04, 0.97, label, transform=ax.transAxes,
+for ax, label in zip(fig.get_axes(), ['A', 'B', 'C', 'D', 'E', 'F']):
+    ax.text(-0.015, 1.05, label, transform=ax.transAxes,
             fontsize=12, fontweight='bold', va='top', ha='right')
 
-plt.savefig('fig2_skov1kG_1labels.png',
-            format='png', dpi=600, bbox_inches='tight')
-# plt.savefig('fig2_skov1kG.svg',
-#             format='svg', dpi=600, bbox_inches='tight')
+# %%  Save figures
+
+save_figures = False
+if save_figures:
+    plt.savefig(f'fig2_hmmix.png', format='png', dpi=600, bbox_inches='tight')
+    plt.savefig(f'fig2_hmmix.svg', format='svg', dpi=600, bbox_inches='tight')
