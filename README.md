@@ -2,6 +2,8 @@
 Code and data to reproduce main figures and simulations of Chevy, Huerta-Sanchez, and Ramachandran, 202X.
 
 ## Files
+### `environment.yml`
+Conda environment file generated via `conda env export | grep -v "^prefix: " > environment.yml`.  This environment was used for all analysis and plotting.
 ### `plotting`
   - `figX_plot.py` contains all the code necessary to create Fig X.
   - `figX_data/` contains all data necessary to plot Fig X.  Datafiles from simulations are provided, and were generated using the scripts provided in `generating_simulation_data/`.  Sources for previously published data are provided in `README.md` files. 
