@@ -85,7 +85,7 @@ tab1['chrX_stderr'] = tab1['x_pbp']
 tab1.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
 tab1.sort_values('aut_x_ratio', inplace=True, ascending=False)
 
-tab1.to_csv('table1_hmmix.txt', sep=' ')
+tab1.to_csv('fig1_data/table1_hmmix.txt', sep=' ')
 
 # %% Functions needed for plotting
 
