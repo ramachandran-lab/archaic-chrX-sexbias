@@ -53,7 +53,7 @@ def find_superpop(pop, return_color=False):
 
 
 # %% Grab data from hmmix
-hmmix_file = f'fig2_data/noPARnoselection_output.csv.gz'
+hmmix_file = 'fig2_data/noPAR_noselection_output.csv.gz'
 
 df = pd.read_csv(hmmix_file)
 df['names'] = df['name']
@@ -85,7 +85,8 @@ tab1['chrX_stderr'] = tab1['x_pbp']
 tab1.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
 tab1.sort_values('aut_x_ratio', inplace=True, ascending=False)
 
-tab1.to_csv('fig1_data/table1_hmmix.txt', sep=' ')
+tab1['superpop'] = [find_superpop(i) for i in tab1.index]
+tab1.to_csv('fig1_data/rev2/check/table1_hmmix.txt', sep=' ')
 
 # %% Functions needed for plotting
 
@@ -101,7 +102,7 @@ spcolors = [superpop_colors[sp] for sp in sps]
 
 # Change sort order of populations for panels D, E
 def get_sort_order(by, df=midf):
-    sdf = midf.sort_values(by='pop')
+    sdf = df.sort_values(by='pop')
     means_df = sdf.groupby(['superpop', 'pop', 'names']).mean()
     # sort
     gb = means_df[by].groupby('pop')
@@ -109,9 +110,6 @@ def get_sort_order(by, df=midf):
     means = means.sort_values(ascending=True)
     sort_order = means.index
     return sort_order
-
-
-popns = get_sort_order('x_pbp')
 
 
 def plot_ratio_eCI(df, by, sort_order=None, existing_axis=None, thresh=5):
@@ -155,8 +153,11 @@ def plot_ratio_eCI(df, by, sort_order=None, existing_axis=None, thresh=5):
     return existing_axis
 
 
-
 # %% * Plot Fig 2
+
+plotdf = midf# [midf['is_female'] == False]
+
+popns = get_sort_order('x_pbp', df=plotdf)
 
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['svg.fonttype'] = 'none'
@@ -179,7 +180,7 @@ axf = fig.add_subplot(gs[4, :])
 
 # # Panels A, B, C
 # Panel A:
-plot_ratio_eCI(midf, by='superpop', existing_axis=axa, sort_order=['EUR', 'AMR', 'EAS', 'SAS'])
+plot_ratio_eCI(plotdf, by='superpop', existing_axis=axa, sort_order=['EUR', 'AMR', 'EAS', 'SAS'])
 axa.set_ylabel('Autosomal : Chromosome X coverage ratio')
 
 # Panels B, C: stacked bar by superpop
@@ -190,7 +191,7 @@ rel_a_by_superpop = []
 aut_means = []
 x_means = []
 for sp in sps:
-    spdf = midf[midf['superpop'] == sp]
+    spdf = plotdf[plotdf['superpop'] == sp]
     x_means.append(np.mean(spdf['x_pbp']))
     aut_means.append(np.mean(spdf['aut_pbp']))
     rel_x_by_superpop.append(np.asarray(spdf['x_pbp']))
@@ -231,8 +232,8 @@ axc.set_title('Chromosome X', fontsize=10)
 # # Panels D, E
 
 # Panel E: Boxes
-boxdata_x = [np.asarray(midf[midf['pop'] == p]['x_pbp']) for p in popns]
-boxdata_a = [np.asarray(midf[midf['pop'] == p]['aut_pbp']) for p in popns]
+boxdata_x = [np.asarray(plotdf[plotdf['pop'] == p]['x_pbp']) for p in popns]
+boxdata_a = [np.asarray(plotdf[plotdf['pop'] == p]['aut_pbp']) for p in popns]
 # autosomes
 pa_boxes = axe.boxplot(boxdata_a, patch_artist=True, positions=list(range(len(popns))))
 # https://stackoverflow.com/a/20291461/18621926
@@ -255,14 +256,14 @@ axe.tick_params(axis='x', pad=12)
 
 # Panel D: Ratio errorbar
 axd.set_ylabel("Aut:ChrX")
-axd = plot_ratio_eCI(midf, 'pop', sort_order=popns, existing_axis=axd)
+axd = plot_ratio_eCI(plotdf, 'pop', sort_order=popns, existing_axis=axd)
 axd.tick_params(labelbottom=False)
 axd.set_xlim(axe.get_xlim())
 
 # Panel F: Rankings
-popns_x = get_sort_order('x_pbp')
-popns_rat = get_sort_order('aut_x_ratio')
-popns_aut = get_sort_order('aut_pbp')
+popns_x = get_sort_order('x_pbp', df=plotdf)
+popns_rat = get_sort_order('aut_x_ratio', df=plotdf)
+popns_aut = get_sort_order('aut_pbp', df=plotdf)
 
 rank_x = dict(zip(popns_x, range(len(popns_x))))
 rank_aut = dict(zip(popns_aut, range(len(popns_aut))))

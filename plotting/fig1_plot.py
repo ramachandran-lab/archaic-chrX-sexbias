@@ -20,19 +20,21 @@ from matplotlib import lines as mlines
 # %% Import data
 
 # Datafiles
-sgdp_info_file2 = 'fig1_data/10_24_2014_SGDP_metainformation_update.txt'
+# sgdp_info_file2 = 'fig1_data/10_24_2014_SGDP_metainformation_update.txt'
 sgdp_info_file = 'fig1_data/SGDP_metadata.279public.21signedLetter.44Fan.samples.txt'
 sank_file = 'fig1_data/Sank16long.txt'
-table1_file = 'fig1_data/table1_missing.txt'
+table1_file = 'fig1_data/rev2/table1_missing.txt'
 skovSGDP_file = 'fig1_data/pgen.1007641.s012.txt'
+hmmix_file = 'fig1_data/rev2/table1_hmmix.txt'
 
 # Dataframes
 oldtab1df = pd.read_csv(table1_file, sep=' ', index_col=False)
-sankdf = pd.read_csv(sank_file, sep='\t', index_col=False,
+sankdf = pd.read_csv(sank_file, sep='\t', index_col=False, usecols=range(8),
                      names=['aut', 'aut_stderr', 'chrX', 'chrX_stderr',
                             'data_source', 'archaic', 'superpop', 'pop'])
 sgdpdf = pd.read_csv(sgdp_info_file, sep='\t', index_col=False)
-sgdpdf2 = pd.read_csv(sgdp_info_file2, sep='\t', index_col=False)
+# sgdpdf2 = pd.read_csv(sgdp_info_file2, sep='\t', index_col=False)
+hmmixdf = pd.read_csv(hmmix_file, sep=' ')
 
 
 # %% Assemble data into one df
@@ -129,6 +131,7 @@ def process_SGDP_Skov_data(datafile):
 
 skovSGDPdf = process_SGDP_Skov_data(skovSGDP_file)
 
+# %%
 # Calculate ratios
 sankdf['region'] = sankdf['pop'].apply(find_sgdp_region)
 sankdf['superpop'] = sankdf['region'].apply(xlate_sp)
@@ -140,9 +143,13 @@ skovSGDPdf['superpop'] = skovSGDPdf['region'].apply(xlate_sp)
 skovSGDP_ratios = skovSGDPdf['aut'] / skovSGDPdf['chrX']
 skovSGDPdf.insert(4, 'Aut_ChrX_ratio', skovSGDP_ratios)
 
+hmmixdf['data_source'] = 'hmmix'
+hmmixdf['Aut_ChrX_ratio'] = hmmixdf['aut_x_ratio']
+
 # Merge dataframes together
 tab1df = pd.merge(oldtab1df, sankdf, how='outer')
 tab1df = pd.merge(tab1df, skovSGDPdf, how='outer')
+tab1df = pd.merge(tab1df, hmmixdf, how='outer')
 
 superpop_colors = {'EAS': 'green', 'EUR': 'blue', 'AFR': 'DarkOrange',
                    'SAS': 'DarkMagenta', 'AMR': 'FireBrick',
@@ -272,7 +279,7 @@ dax.set_yticks([])
 
 save_figures = False
 if save_figures:
-    plt.savefig('fig1_table1.svg',
+    plt.savefig('fig1_rev2_table1.svg',
                 format='svg', dpi=600, bbox_inches='tight')
-    plt.savefig('fig1_table1.png',
+    plt.savefig('fig1_rev2_table1.png',
                 format='png', dpi=600, bbox_inches='tight')
