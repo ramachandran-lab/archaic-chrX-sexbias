@@ -8,12 +8,17 @@ Created on Tue Jan 24 15:47:19 2023
 import pandas as pd
 from interlap import InterLap
 
-id_file = 'ingroup_haps.txt'
-id_list = [line.rstrip() for line in open(id_file)]
-# decode_folder = 'test_full_length/'
-# id_list = ['HG00096', 'HG00097', 'HG00099', 'HG00100', 'HG00101']
+# Filter tracts
+restrict_to_archaic_SNPs = True  # this applies to autosomes too!  all the others are just for chrX atm.  also does not change denominator
+remove_PAR = True
+remove_selection = True
+remove_centromere = False
+remove_gaps = False
+
+output_file_basename = 'output.csv.gz'
 
 
+# %%  Define functions
 def process_chrX(df, remove_PAR=False, remove_selection=False, remove_centromere=False, remove_gaps=False):
 
     def filter_regions(df, filter_starts, filter_ends):
@@ -30,7 +35,6 @@ def process_chrX(df, remove_PAR=False, remove_selection=False, remove_centromere
         tot_bp_chrX_after_filtering = df['length'].sum()
         tot_bp_under_mask = tot_bp_chrX_before_filtering - tot_bp_chrX_after_filtering
         pct_filtered_this_step = tot_bp_under_mask / tot_bp_chrX_before_filtering * 100
-        # print(f"\tremoved {frac_chrX_tracts_under_mask*100}% of chrX tracts")
         print(f"\tremoved {pct_filtered_this_step}% of chrX coverage (bp)")
         return df, pct_filtered_this_step
 
@@ -55,18 +59,15 @@ def process_chrX(df, remove_PAR=False, remove_selection=False, remove_centromere
         PAR_ends = [2699520, 155260560]
         print("filtering PAR:")
         df, _ = filter_regions(df, PAR_starts, PAR_ends)
-        # df['PAR_pct_removed'] = amt
 
     if remove_selection:
         selection_file = 'skov_selection_targets.csv'
-        # selection_file = '/Users/egibson/Documents/science/Grad/SP20/demog20/proj/neand-purging/plotting/ms-repo/plotting/fig2_data/LauritsSkovIntrogressionMaps/media-3.csv'
         sdf = pd.read_csv(selection_file, skiprows=1, skip_blank_lines=True)
         sdf = sdf.dropna()
         selection_starts = sdf['Start.2'] * 100000
         selection_ends = sdf['End.2'] * 100000
         print("filtering selection")
         df, _ = filter_regions(df, selection_starts, selection_ends)
-        # df['selection_pct_removed'] = amt
 
     return df
 
@@ -75,12 +76,7 @@ def find_segments_on_one_hap(indiv_ID, hap, chr_type='autosome',
                              remove_PAR=False, remove_selection=False, remove_centromere=False, remove_gaps=False,
                              restrict_to_archaic_SNPs=False):
 
-    if restrict_to_archaic_SNPs:
-        arch_prefix = 'archaic_'
-    else:
-        arch_prefix = ''
-
-    decode_output_file = f'{arch_prefix}decoded_{chr_type}s/decoded.{indiv_ID}.{chr_type}.{hap}.txt'
+    decode_output_file = f'decoded_{chr_type}s/decoded.{indiv_ID}.{chr_type}.{hap}.txt'
 
     df = pd.read_table(decode_output_file)
 
@@ -109,14 +105,6 @@ def find_segments_in_one_indiv(indiv_ID, chr_type='autosome', remove_PAR=False,
                       for hap in ('hap1', 'hap2')])
 
 
-# def show_all_segments_in_all_indivs(all_indiv_IDs, chr_type='autosome', remove_PAR=False,
-#                                     remove_selection=False, remove_centromere=False, remove_gaps=False):
-#     return pd.concat([find_segments_in_one_indiv(indiv_ID, chr_type=chr_type,
-#                                                  remove_PAR=remove_PAR,
-#                                                  remove_selection=remove_selection, remove_centromere=remove_centromere, remove_gaps=remove_gaps)
-#                       for indiv_ID in all_indiv_IDs])
-
-
 def summarize_length_in_one_indiv(indiv_ID, chr_type='autosome', remove_PAR=False,
                                   remove_selection=False, remove_centromere=False, remove_gaps=False, restrict_to_archaic_SNPs=False):
     df = find_segments_in_one_indiv(indiv_ID, chr_type=chr_type,
@@ -137,16 +125,11 @@ def summarize_length(all_indiv_IDs, chr_type='autosome', remove_PAR=False,
                       for indiv_ID in all_indiv_IDs])
 
 
+# %%  summarize tract length per individual
+id_file = 'ingroup_haps.txt'
+id_list = [line.rstrip() for line in open(id_file)]
+
 aut_length_df = summarize_length(id_list)
-
-restrict_to_archaic_SNPs = True  # this applies to autosomes too!  all the others are just for chrX atm.  also does not change denominator
-remove_PAR = True
-remove_selection = True
-remove_centromere = False
-remove_gaps = False
-
-output_file_basename = 'output.csv.gz'
-
 chrX_length_df = summarize_length(id_list, chr_type='chrX',
                                   remove_PAR=remove_PAR,
                                   remove_selection=remove_selection,

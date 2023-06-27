@@ -22,7 +22,7 @@ echo "Ingroup_hap: "$ingroup_hap
 # mkdir obs_files
 # mkdir trained_files
 # mkdir decoded_autosomes
-# mkdir decoded_chrXs  # would need to change for diploid mode.  see decode_chrX.py
+# mkdir decoded_chrXs
 
 # create_ingroup
 echo "create_ingroup is starting"
