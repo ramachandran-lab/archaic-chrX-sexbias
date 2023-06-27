@@ -8,7 +8,7 @@ Code for plotting Fig 1.
         Colors indicate continental group; see Table 1 for key.
         Shapes indicate estimation method; see S2 Table for details.
         Light grey clines show autosomal to chromosome X coverage ratios of 1 (i.e., equal per bp coverage), 2 (i.e., autosomal archaic coverage is double that of chromosome X), 4, 8, and 16.
-        Dark grey cline shows median autosomal to chromosome X coverage ratio of 7.91.
+        Dark grey cline shows median autosomal to chromosome X coverage ratio of 6.9.
         Nearly all points are well below the 1:1 line, indicating greater per-bp coverage on autosomes than chromosome X.
 """
 
@@ -20,12 +20,11 @@ from matplotlib import lines as mlines
 # %% Import data
 
 # Datafiles
-# sgdp_info_file2 = 'fig1_data/10_24_2014_SGDP_metainformation_update.txt'
 sgdp_info_file = 'fig1_data/SGDP_metadata.279public.21signedLetter.44Fan.samples.txt'
 sank_file = 'fig1_data/Sank16long.txt'
 table1_file = 'fig1_data/rev2/table1_missing.txt'
 skovSGDP_file = 'fig1_data/pgen.1007641.s012.txt'
-hmmix_file = 'fig1_data/rev2/table1_hmmix.txt'
+hmmix_file = 'fig1_data/table1_hmmix.txt'
 
 # Dataframes
 oldtab1df = pd.read_csv(table1_file, sep=' ', index_col=False)
@@ -33,7 +32,6 @@ sankdf = pd.read_csv(sank_file, sep='\t', index_col=False, usecols=range(8),
                      names=['aut', 'aut_stderr', 'chrX', 'chrX_stderr',
                             'data_source', 'archaic', 'superpop', 'pop'])
 sgdpdf = pd.read_csv(sgdp_info_file, sep='\t', index_col=False)
-# sgdpdf2 = pd.read_csv(sgdp_info_file2, sep='\t', index_col=False)
 hmmixdf = pd.read_csv(hmmix_file, sep=' ')
 
 
@@ -131,7 +129,8 @@ def process_SGDP_Skov_data(datafile):
 
 skovSGDPdf = process_SGDP_Skov_data(skovSGDP_file)
 
-# %%
+# %% Calculate ratios and merge into one df
+
 # Calculate ratios
 sankdf['region'] = sankdf['pop'].apply(find_sgdp_region)
 sankdf['superpop'] = sankdf['region'].apply(xlate_sp)
@@ -192,8 +191,8 @@ ax.plot([0, 2 * tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
 ax.annotate("4:1", xy=(0.0279, 0.0074))
 ax.plot([0, widest], [0, 0.25 * widest], ls='solid', c='lightgrey', zorder=1)
 
-# ax.annotate("8:1", xy=(0.038, 0.0041))
-# ax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
+ax.annotate("8:1", xy=(0.0277, 0.00285))
+ax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
 
 ax.annotate("16:1", xy=(0.02737, 0.001))
 ax.plot([0, widest], [0, (1 / 16) * widest], ls='solid', c='lightgrey', zorder=1)
@@ -256,7 +255,7 @@ dax.plot([0, widest], [0, (1 / allmedian) * widest], ls='solid', color='grey', z
 dax.plot([0, tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, 2 * tallest], [0, tallest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, widest], [0, 0.25 * widest], ls='solid', c='lightgrey', zorder=1)
-# dax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
+dax.plot([0, widest], [0, 0.125 * widest], ls='solid', c='lightgrey', zorder=1)
 dax.plot([0, widest], [0, (1 / 16) * widest], ls='solid', c='lightgrey', zorder=1)
 for d in data_list:
     mask = tab1df['data_source'] == d
@@ -279,7 +278,7 @@ dax.set_yticks([])
 
 save_figures = False
 if save_figures:
-    plt.savefig('fig1_rev2_table1.svg',
+    plt.savefig('fig1_table1.svg',
                 format='svg', dpi=600, bbox_inches='tight')
-    plt.savefig('fig1_rev2_table1.png',
+    plt.savefig('fig1_table1.png',
                 format='png', dpi=600, bbox_inches='tight')

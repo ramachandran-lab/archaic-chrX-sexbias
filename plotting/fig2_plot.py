@@ -25,7 +25,6 @@ Code for plotting Fig 2.
 
 import pandas as pd
 import numpy as np
-from interlap import InterLap
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
@@ -53,17 +52,17 @@ def find_superpop(pop, return_color=False):
 
 
 # %% Grab data from hmmix
-hmmix_file = 'fig2_data/noPAR_noselection_output.csv.gz'
+hmmix_file = 'fig2_data/yesarchaicvar_noPAR_noselection_output.csv.gz'
 
 df = pd.read_csv(hmmix_file)
 df['names'] = df['name']
 # remove samples
-midf = df[df['aut_pbp'] < 0.1]
-midf = midf[midf['aut_x_ratio'] < 50]
+filtered_df = df[df['aut_pbp'] < 0.1]
+filtered_df = filtered_df[filtered_df['aut_x_ratio'] < 50]
 
 # %%  create file for table 1
 
-tab1_means = midf.groupby('pop').mean()[['aut_pbp', 'x_pbp', 'aut_x_ratio']]
+tab1_means = filtered_df.groupby('pop').mean()[['aut_pbp', 'x_pbp', 'aut_x_ratio']]
 tab1_means['aut'] = tab1_means['aut_pbp']
 tab1_means['aut'] *= 100
 tab1_means['aut'] = tab1_means['aut'].apply(lambda x: round(x, 2))
@@ -75,7 +74,7 @@ tab1_means['chrX'] = tab1_means['chrX'].apply(lambda x: round(x, 2))
 tab1_means['aut_x_ratio'] = tab1_means['aut_x_ratio'].apply(lambda x: round(x, 1))
 tab1_means.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
 
-tab1_sterr = midf.groupby('pop').std()[['aut_pbp', 'x_pbp']]
+tab1_sterr = filtered_df.groupby('pop').std()[['aut_pbp', 'x_pbp']]
 tab1_sterr *= 100
 tab1_sterr = tab1_sterr.apply(lambda x: round(x, 2))
 
@@ -86,7 +85,7 @@ tab1.drop(columns=['aut_pbp', 'x_pbp'], inplace=True)
 tab1.sort_values('aut_x_ratio', inplace=True, ascending=False)
 
 tab1['superpop'] = [find_superpop(i) for i in tab1.index]
-tab1.to_csv('fig1_data/rev2/check/table1_hmmix.txt', sep=' ')
+tab1.to_csv('fig1_data/table1_hmmix.txt', sep=' ')
 
 # %% Functions needed for plotting
 
@@ -101,7 +100,7 @@ spcolors = [superpop_colors[sp] for sp in sps]
 
 
 # Change sort order of populations for panels D, E
-def get_sort_order(by, df=midf):
+def get_sort_order(by, df=filtered_df):
     sdf = df.sort_values(by='pop')
     means_df = sdf.groupby(['superpop', 'pop', 'names']).mean()
     # sort
@@ -155,7 +154,7 @@ def plot_ratio_eCI(df, by, sort_order=None, existing_axis=None, thresh=5):
 
 # %% * Plot Fig 2
 
-plotdf = midf# [midf['is_female'] == False]
+plotdf = filtered_df  # use df to plot all samples
 
 popns = get_sort_order('x_pbp', df=plotdf)
 
@@ -321,5 +320,5 @@ for ax, label in zip(fig.get_axes(), ['A', 'B', 'C', 'D', 'E', 'F']):
 
 save_figures = False
 if save_figures:
-    plt.savefig(f'fig2_hmmix.png', format='png', dpi=600, bbox_inches='tight')
-    plt.savefig(f'fig2_hmmix.svg', format='svg', dpi=600, bbox_inches='tight')
+    plt.savefig('fig2_hmmix.png', format='png', dpi=600, bbox_inches='tight')
+    plt.savefig('fig2_hmmix.svg', format='svg', dpi=600, bbox_inches='tight')
