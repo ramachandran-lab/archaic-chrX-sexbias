@@ -14,7 +14,7 @@ initialize() {
     initializeGenomicElementType("g1", c(m1), c(1.0)); // no synonymous mutations, mutation rate is scaled
 
     //read in exon and recomb info
-    info_lines = readFile("/path/to/ms-repo/generating_simulation_data/sim_seq_info.txt");
+    info_lines = readFile("generating_simulation_data/sim_seq_info.txt");
 
     //recombination
     rec_ends = NULL;
@@ -103,6 +103,6 @@ initialize() {
 }
 
 17500 late() {
-    sim.treeSeqOutput("/path/to/ms-repo/generating_simulation_data/chr1_h0.0_sscale1_NsNr0.01_mfrac0.5_" + simnum + ".trees.decap");
+    sim.treeSeqOutput("generating_simulation_data/chr1_h0.0_sscale1_NsNr0.01_mfrac0.5_" + simnum + ".trees.decap");
 }
 

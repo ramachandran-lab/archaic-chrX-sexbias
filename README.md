@@ -1,15 +1,34 @@
 # archaic-chrX-sexbias
 Code and data to reproduce main figures and simulations of Chevy, Huerta-Sanchez, and Ramachandran, 202X.
 
-## Files
-### `environment.yml`
-Conda environment file generated via `conda env export | grep -v "^prefix: " > environment.yml`.  This environment was used for all analysis and plotting.
-### `plotting`
+## Plotting main figures `plotting/`
   - `figX_plot.py` contains all the code necessary to create Fig X.
   - `figX_data/` contains all data necessary to plot Fig X.  Datafiles from simulations are provided, and were generated using the scripts provided in `generating_simulation_data/`.  Sources for previously published data are provided in `README.md` files. 
-  - `fig4_prep.py` contains the code for pickling the data necessary for plotting each panel of Fig 4 into four files: `fig4_tracts_[ABCD].pkl`.  These `.pkl` files are provided. 
   - `extract_pI_data.py` and `extract_pI_data_sexbias.py` contain helper functions to organize simulation output files into dataframes.  They are imported as modules, so should be in the same directory or added to the path using `sys.path.append('/path/to/files')`.
-### `generating_simulation_data`
+## Calling 1kG introgression tracts `hmmix/`
+  ### prerequisites for running hmmix from this folder
+  - Install software as described here: https://github.com/LauritsSkov/Introgression-detection#installation
+  - Download all files as described in the original software here: https://github.com/LauritsSkov/Introgression-detection#getting-data
+  - TODO: **diplofy males**
+  - Place `.bcf` files into `bcf_local/`, ancestral `.fa` files into `anc_files/`, and archaic variant files into `archaicvar/.
+  - *Rename chromosome X `.bcf` to match format of others:* 
+      ``` 
+      mv /path/to/diplofied_chrX_file.bcf bcf_local/ALL.chrX.phase3_shapeit2_mvncall_integrated_v5.20130502.genotypes.bcf
+      ```
+  ### running `hmmix`
+  - `ingroup_haps.txt` lists the 1835 1kG sample IDs presented in the paper.
+  - `individuals.json` defines the 1835 ingroup samples, and the 292 outgroup samples from the YRI, MSL, and ESN sample groups.
+  - `1_submit_outgroup.sh` is the first step, and creates the `outgroup.txt` file.
+  - `2_submit_mutation_rate.sh` is the second step, and creates the `mutationrate.bed` file.
+  - `345_submit_ingroup_train_decode_decodeX.sh` are the rest of the steps, which create and fill the `obs_files/`, `trained_files/`, `decoded_chrXs/`, and `decoded_autosomes/` folders.
+  ### processing hmmix output
+  - `make_df_from_decodings.py` filters coverage tract calls, calculates per-base-pair coverage rates, and saves output as a `.csv.gz` file that is loaded by `plotting/fig2_plot.py`.
+    - *N.B.* The second section of `fig2_plot.py`, `# %%  create file for table 1`, will overwrite `plotting/fig1_data/table1_hmmix.txt` with results from this output file.
+  - `decode_chrX.py` is called by `345_submit_ingroup_train_decode_decodeX.sh`, and implements a correction to the emissions parameters to decode chromsome X.
+  - `skov_selection_targets.csv` contains locations of putative targets of selection on chromosome X.  Tracts overlapping these were excluded from analysis.
+    - File is renamed from `media-3.csv`, downloaded from [the preprint](https://www.biorxiv.org/content/10.1101/2022.09.19.508556v1.supplementary-material).  The results are now published as [Skov et al., 2023](https://doi-org.revproxy.brown.edu/10.1016/j.xgen.2023.100274).
+  - `all_hg19_GRCh37_chrX_gaps` contains locations of all gaps (telomeres, centromeres, etc.) in chrX.  These were not excluded from analysis, but can be using the `remove_gaps` variable in `make_df_from_decodings.py` (ln. 16).
+## Generating simulation data `generating_simulation_data/`
  - `sim_seq_info.txt` contains the exon coordinates and recombination rate map used in SLiM simulations.
  - `simulation.slim` is an example SLiM simulation script used to generate simulated archaic coverage data.  In order to run a simulation, confirm that the:
    - paths to `sim_seq_info.txt` (ln. 17) and the output treesequence `.trees.decap` (ln. 106) are set correctly,
